@@ -1,0 +1,75 @@
+import random
+import pandas as pd
+import json
+from collections import defaultdict
+
+# Load configuration dynamically (you can replace this with a JSON file)
+config = {
+    "days": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    "time_slots": ["9:30-10:30", "10:30-11:30", "11:30-12:30", "12:30-1:30",
+                   "1:30-2:30", "2:30-3:30", "3:30-4:30", "4:30-5:30"],
+    "subjects": [
+        {"name": "BSC301", "type": "theory", "teacher": "AU", "room": "A202", "hours_per_week": 3},
+        {"name": "ESC301", "type": "theory", "teacher": "KB", "room": "A202", "hours_per_week": 3},
+        {"name": "PCC-CS301", "type": "theory", "teacher": "LB", "room": "A202", "hours_per_week": 3},
+        {"name": "PCC-CS302", "type": "theory", "teacher": "SM", "room": "A202", "hours_per_week": 3},
+        {"name": "HSMC301", "type": "theory", "teacher": "BB", "room": "A202", "hours_per_week": 3},
+        {"name": "ESC391", "type": "lab", "teacher": ["KB", "KN"], "room": "NB 406", "hours_per_week": 4},
+        {"name": "PCCC391", "type": "lab", "teacher": ["SH", "SM"], "room": "NB 403", "hours_per_week": 4},
+        {"name": "PCCC392", "type": "lab", "teacher": ["LB", "SK"], "room": "NB 406", "hours_per_week": 4}
+    ]
+}
+
+# Extract days and time slots
+days = config["days"]
+time_slots = config["time_slots"]
+
+# Create an empty timetable
+timetable = pd.DataFrame(index=days, columns=time_slots)
+
+# Dynamic scheduling logic
+def schedule_subjects(config):
+    subjects = config["subjects"]
+    for subject in subjects:
+        hours = subject["hours_per_week"]
+        if subject["type"] == "theory":
+            assigned = 0
+            while assigned < hours:
+                day = random.choice(days)
+                slot = random.choice(time_slots[:4])  # Morning slots for theory
+                if pd.isna(timetable.loc[day, slot]):
+                    timetable.loc[day, slot] = f"{subject['name']} ({subject['teacher']}, {subject['room']})"
+                    assigned += 1
+        elif subject["type"] == "lab":
+            assigned = 0
+            while assigned < hours // 2:  # Labs take 2-hour blocks
+                day = random.choice(days)
+                slot_start = random.choice(time_slots[4:6])  # Afternoon slots for labs
+                slot_end_index = time_slots.index(slot_start) + 1
+                if slot_end_index < len(time_slots):
+                    slot_end = time_slots[slot_end_index]
+                    if (
+                        pd.isna(timetable.loc[day, slot_start])
+                        and pd.isna(timetable.loc[day, slot_end])
+                    ):
+                        timetable.loc[day, slot_start] = f"{subject['name']} ({subject['teacher'][0]}, {subject['room']})"
+                        timetable.loc[day, slot_end] = f"{subject['name']} ({subject['teacher'][1]}, {subject['room']})"
+                        assigned += 1
+
+# Schedule the subjects
+schedule_subjects(config)
+
+# Fill empty slots with "Recess" or blanks
+for day in days:
+    for slot in time_slots:
+        if pd.isna(timetable.loc[day, slot]):
+            if slot == "12:30-1:30":
+                timetable.loc[day, slot] = "Recess"
+            else:
+                timetable.loc[day, slot] = ""
+
+# Display and export the timetable
+import ace_tools as tools; tools.display_dataframe_to_user(name="Dynamic Timetable", dataframe=timetable)
+
+# Export to CSV (optional)
+#timetable.to_csv("dynamic_timetable.csv", index=True)
